@@ -1,0 +1,60 @@
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import time
+ 
+# Step 1: Setup - base URL of the website we are scraping
+BASE_URL = "https://quotes.toscrape.com"
+ 
+# This list will store all the scraped data
+all_quotes = []
+ 
+# Step 2: Start from page 1, keep going until there is no "next" page
+page_url = BASE_URL + "/page/1/"
+ 
+while page_url:
+    print(f"Scraping: {page_url}")
+ 
+    # Step 3: Fetch the page HTML
+    response = requests.get(page_url)
+ 
+    # Always check if request was successful (status code 200 = OK)
+    if response.status_code != 200:
+        print("Failed to fetch page, stopping.")
+        break
+ 
+    # Step 4: Parse HTML with BeautifulSoup
+    soup = BeautifulSoup(response.text, "html.parser")
+ 
+    # Step 5: Find all quote containers on this page
+    quote_blocks = soup.find_all("div", class_="quote")
+ 
+    # Step 6: Loop through each quote block and extract data
+    for block in quote_blocks:
+        text = block.find("span", class_="text").get_text(strip=True)
+        author = block.find("small", class_="author").get_text(strip=True)
+        tags = [tag.get_text(strip=True) for tag in block.find_all("a", class_="tag")]
+ 
+        all_quotes.append({
+            "quote": text,
+            "author": author,
+            "tags": ", ".join(tags)
+        })
+ 
+    # Step 7: Check if there is a "Next" page button
+    next_button = soup.find("li", class_="next")
+    if next_button:
+        next_link = next_button.find("a")["href"]
+        page_url = BASE_URL + next_link
+        time.sleep(1)  # be polite - wait 1 second between requests
+    else:
+        page_url = None  # no more pages, stop the loop
+ 
+# Step 8: Convert collected data into a pandas DataFrame
+df = pd.DataFrame(all_quotes)
+ 
+# Step 9: Save to CSV file
+df.to_csv("scraped_quotes.csv", index=False, encoding='utf-8-sig')
+ 
+print(f"\nDone! Scraped {len(df)} quotes and saved to scraped_quotes.csv")
+print(df.head())
